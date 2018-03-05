@@ -18,8 +18,8 @@
 CPPEX_SRC = $(wildcard cpp-package/example/*.cpp)
 CPPEX_EXE = $(patsubst cpp-package/example/%.cpp, build/cpp-package/example/%, $(CPPEX_SRC))
 
-CPPEX_CFLAGS += -Icpp-package/include -Ibuild/cpp-package/include
-CPPEX_EXTRA_LDFLAGS := -L$(ROOTDIR)/lib -lmxnet
+CPPEX_CFLAGS += -Icpp-package/include -Ibuild/cpp-package/include -fsanitize=address
+CPPEX_EXTRA_LDFLAGS := -L$(ROOTDIR)/lib -lmxnet -fsanitize=address
 
 EXTRA_PACKAGES += cpp-package-example-all
 EXTRA_PACKAGES_CLEAN += cpp-package-example-clean
