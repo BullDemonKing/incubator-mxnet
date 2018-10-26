@@ -309,7 +309,7 @@ struct Take {
   template<typename DType, typename IType>
   MSHADOW_XINLINE static void Map(int i, DType* out_data, const DType* in_data,
                                   const IType* idx, const int M, const int K) {
-    int j = static_cast<int>(idx[i/M]);
+    int64_t j = static_cast<int64_t>(idx[i/M]);
     if (clip) {
       if (j <= 0) j = 0;
       else if (j >= K) j = K - 1;
