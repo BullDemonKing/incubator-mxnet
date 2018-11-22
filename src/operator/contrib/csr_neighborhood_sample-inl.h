@@ -180,6 +180,33 @@ static void GetSrcList(const dgl_id_t* val_list,
   }
 }
 
+static void RandomSample(size_t set_size, size_t num,
+                         std::vector<size_t> &out) {
+  std::unordered_set<size_t> sampled_idxs;
+  while (sampled_idxs.size() < num)
+    sampled_idxs.insert(rand() % set_size);
+  out.clear();
+  for (auto it = sampled_idxs.begin(); it != sampled_idxs.end(); it++)
+    out.push_back(*it);
+}
+
+static void NegateSet(const std::vector<size_t> &idxs,
+                      size_t set_size, std::vector<size_t> &out) {
+  // idxs must have been sorted.
+  auto it = idxs.begin();
+  size_t i = 0;
+  CHECK_GT(set_size, idxs.back());
+  for (; i < set_size && it != idxs.end(); i++) {
+    if (*it == i) {
+      it++;
+      continue;
+    }
+    out.push_back(i);
+  }
+  for (; i < set_size; i++)
+    out.push_back(i);
+}
+
 static void GetSample(std::vector<dgl_id_t>& ver_list,
                       std::vector<dgl_id_t>& edge_list,
                       const size_t max_num_neighbor,
@@ -195,27 +222,23 @@ static void GetSample(std::vector<dgl_id_t>& ver_list,
     return;
   }
   // If we just sample a small number of elements from a large neighbor list.
-  std::vector<size_t> sorted_idxs(max_num_neighbor);
-  if (ver_list.size() > max_num_neighbor * 10) {
-    std::unordered_set<size_t> sampled_idxs;
-    while (sampled_idxs.size() < max_num_neighbor) {
-      // rand_num = [0, ver_list.size()-1]
-      size_t rand_num = rand() % ver_list.size();
-      sampled_idxs.insert(rand_num);
-    }
-    size_t i = 0;
-    for (auto it = sampled_idxs.begin(); it != sampled_idxs.end(); it++, i++)
-      sorted_idxs[i] = *it;
+  std::vector<size_t> sorted_idxs;
+  if (ver_list.size() > max_num_neighbor * 2) {
+    sorted_idxs.reserve(max_num_neighbor);
+    RandomSample(ver_list.size(), max_num_neighbor, sorted_idxs);
+    std::sort(sorted_idxs.begin(), sorted_idxs.end());
   } else {
-    // The vertex list is relatively small. We just shuffle the list and
-    // take the first few.
-    std::vector<size_t> idxs(ver_list.size());
-    for (size_t i = 0; i < idxs.size(); i++) idxs[i] = i;
-    std::random_shuffle(idxs.begin(), idxs.end());
-    for (size_t i = 0; i < max_num_neighbor; i++)
-      sorted_idxs[i] = idxs[i];
+    std::vector<size_t> negate;
+    negate.reserve(ver_list.size() - max_num_neighbor);
+    RandomSample(ver_list.size(), ver_list.size() - max_num_neighbor,
+                 negate);
+    std::sort(negate.begin(), negate.end());
+    NegateSet(negate, ver_list.size(), sorted_idxs);
   }
-  std::sort(sorted_idxs.begin(), sorted_idxs.end());
+  // verify the result.
+  CHECK_EQ(sorted_idxs.size(), max_num_neighbor);
+  for (size_t i = 1; i < sorted_idxs.size(); i++)
+    CHECK_GT(sorted_idxs[i], sorted_idxs[i - 1]);
 
   for (auto idx : sorted_idxs) {
     out.push_back(ver_list[idx]);
