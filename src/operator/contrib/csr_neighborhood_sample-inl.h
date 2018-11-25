@@ -353,13 +353,20 @@ static void SampleSubgraph(const NDArray &csr, const NDArray &seed_arr,
   out[max_num_vertices] = sub_ver_mp.size();
 
   // Construct sub_csr_graph
-  // TODO reduce the memory copy
-  std::vector<dgl_id_t> sub_val;
-  std::vector<dgl_id_t> sub_col_list;
-  std::vector<dgl_id_t> sub_indptr(max_num_vertices+1, 0);
-  sub_val.reserve(num_edges);
-  sub_col_list.reserve(num_edges);
+  TShape data_shape(1);
+  TShape indptr_shape(1);
+  data_shape[0] = num_edges;
+  indptr_shape[0] = max_num_vertices+1;
+  sub_csr.CheckAndAllocData(data_shape);
+  sub_csr.CheckAndAllocAuxData(csr::kIdx, data_shape);
+  sub_csr.CheckAndAllocAuxData(csr::kIndPtr, indptr_shape);
 
+  dgl_id_t* val_list_out = sub_csr.data().dptr<dgl_id_t>();
+  dgl_id_t* col_list_out = sub_csr.aux_data(1).dptr<dgl_id_t>();
+  dgl_id_t* indptr_out = sub_csr.aux_data(0).dptr<dgl_id_t>();
+
+  size_t collected_nedges = 0;
+  indptr_out[0] = 0;
   for (size_t i = 0, index = 1; i < num_vertices; i++) {
     dgl_id_t dst_id = *(out + i);
     auto it = neigh_mp.find(dst_id);
@@ -367,36 +374,16 @@ static void SampleSubgraph(const NDArray &csr, const NDArray &seed_arr,
       const auto &edges = it->second.edges;
       const auto &neighs = it->second.neighs;
       CHECK_EQ(edges.size(), neighs.size());
-      for (auto& val : edges) {
-        sub_val.push_back(val);
-      }
-      for (auto& val : neighs) {
-        sub_col_list.push_back(val);
-      }
-      sub_indptr[index] = sub_indptr[index-1] + edges.size();
+      std::copy(edges.begin(), edges.end(), val_list_out + collected_nedges);
+      std::copy(neighs.begin(), neighs.end(), col_list_out + collected_nedges);
+      collected_nedges += edges.size();
+      indptr_out[index] = indptr_out[index-1] + edges.size();
     } else {
-      sub_indptr[index] = sub_indptr[index-1];
+      indptr_out[index] = indptr_out[index-1];
     }
     index++;
   }
-
-  // Copy sub_csr_graph to output[1]
-  TShape shape_1(1);
-  TShape shape_2(1);
-  shape_1[0] = sub_val.size();
-  shape_2[0] = sub_indptr.size();
-  sub_csr.CheckAndAllocData(shape_1);
-  sub_csr.CheckAndAllocAuxData(csr::kIdx, shape_1);
-  sub_csr.CheckAndAllocAuxData(csr::kIndPtr, shape_2);
-
-  dgl_id_t* val_list_out = sub_csr.data().dptr<dgl_id_t>();
-  dgl_id_t* col_list_out = sub_csr.aux_data(1).dptr<dgl_id_t>();
-  dgl_id_t* indptr_out = sub_csr.aux_data(0).dptr<dgl_id_t>();
-
-
-  std::copy(sub_val.begin(), sub_val.end(), val_list_out);
-  std::copy(sub_col_list.begin(), sub_col_list.end(), col_list_out);
-  std::copy(sub_indptr.begin(), sub_indptr.end(), indptr_out);
+  CHECK_EQ(collected_nedges, num_edges);
 }
 
 static void CSRNeighborSampleComputeExCPU(const nnvm::NodeAttrs& attrs,
