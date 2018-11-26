@@ -182,9 +182,10 @@ static void GetSrcList(const dgl_id_t* val_list,
 
 static void RandomSample(size_t set_size, size_t num,
                          std::vector<size_t> &out) {
+  static thread_local unsigned int seed = 123;
   std::unordered_set<size_t> sampled_idxs;
   while (sampled_idxs.size() < num)
-    sampled_idxs.insert(rand() % set_size);
+    sampled_idxs.insert(rand_r(&seed) % set_size);
   out.clear();
   for (auto it = sampled_idxs.begin(); it != sampled_idxs.end(); it++)
     out.push_back(*it);
