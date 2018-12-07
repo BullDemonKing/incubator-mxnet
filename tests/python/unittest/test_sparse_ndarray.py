@@ -1050,6 +1050,30 @@ def test_sparse_getnnz():
         for a in axis:
             check_sparse_getnnz(d, a)
 
+@with_seed()
+def test_sparse_slice_concat():
+    # FIXME requires gpu
+    num_rows = 10000
+    embed = mx.nd.random.uniform(shape=(num_rows, 7))
+    num_cached_rows = 1000
+    embed_cpu = embed[num_cached_rows:]
+    embed_gpu = embed[:num_cached_rows].as_in_context(mx.gpu())
+    idx_np = np.random.choice(num_rows, num_cached_rows, replace=False)
+    cpu_idx = np.where(idx_np >= num_cached_rows)
+    cpu_expected = embed.take(mx.nd.array(cpu_idx, dtype='int64')).reshape((-1, 7))
+    idx = mx.nd.array(idx_np, dtype='int64').sort()
+    cpu_slice = mx.nd.contrib.sparse_slice(embed_cpu, idx, total_num_rows=num_rows)
+    #print(cpu_expected)
+    #print(cpu_slice.data)
+    #assert_almost_equal(cpu_expected.asnumpy(), cpu_slice.data.asnumpy())
+    expected = embed.take(idx).reshape((-1,7))
+    #print(expected)
+    concat = mx.nd.contrib.sparse_concat(embed_gpu, idx.copyto(mx.gpu()), cpu_slice.copyto(mx.gpu()))
+    #print(concat)
+    assert_almost_equal(expected.asnumpy(), concat.asnumpy())
+    mx.nd.waitall()
+
 if __name__ == '__main__':
     import nose
-    nose.runmodule()
+    #nose.runmodule()
+    test_sparse_slice_concat()
