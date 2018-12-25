@@ -122,8 +122,8 @@ struct ArgSortParam : public dmlc::Parameter<ArgSortParam> {
     .add_enum("float32", mshadow::kFloat32)
     .add_enum("float64", mshadow::kFloat64)
     .set_default(mshadow::kFloat32)
-    .describe("DType of the output indices. It is only valid when ret_typ is \"indices\" or"
-              " \"both\". An error will be raised if the selected data type cannot precisely "
+    .describe("DType of the output indices."
+              "An error will be raised if the selected data type cannot precisely "
               "represent the indices.");
   }
 };
